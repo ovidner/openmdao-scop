@@ -8,5 +8,7 @@ setup(
     include_package_data=True,
     python_requires=">=3.8, <4",
     setup_requires=["setuptools_scm"],
-    install_requires=["openmdao>=3.4", "numpy", "pandas", "xarray", "pygmo"],
+    # FIXME: this should also list pygmo as a requirement. However, pygmo lacks
+    # the correct metadata even when installed with Conda, so it will just break.
+    install_requires=["openmdao>=3.4", "numpy", "pandas", "xarray"],
 )
