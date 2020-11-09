@@ -8,4 +8,5 @@ setup(
     include_package_data=True,
     python_requires=">=3.8, <4",
     setup_requires=["setuptools_scm"],
+    install_requires=["openmdao>=3.4", "numpy", "pandas", "xarray", "pygmo"],
 )
