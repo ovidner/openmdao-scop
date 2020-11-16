@@ -53,15 +53,8 @@ def generate_abs2meta(recording_requester):
         objectives = driver._objs
         responses = driver._responses
 
-    inputs = (
-        system._var_allprocs_abs_names["input"]
-        + system._var_allprocs_abs_names_discrete["input"]
-    )
-
-    outputs = (
-        system._var_allprocs_abs_names["output"]
-        + system._var_allprocs_abs_names_discrete["output"]
-    )
+    inputs = list(system.abs_name_iter("input", local=False, discrete=True))
+    outputs = list(system.abs_name_iter("output", local=False, discrete=True))
 
     full_var_set = [
         (outputs, "output"),
@@ -88,17 +81,23 @@ def generate_abs2meta(recording_requester):
 
     # absolute pathname to metadata mappings for continuous & discrete variables
     # discrete mapping is sub-keyed on 'output' & 'input'
-    real_meta = system._var_allprocs_abs2meta
-    disc_meta = system._var_allprocs_discrete
+    real_meta_in = system._var_allprocs_abs2meta["input"]
+    real_meta_out = system._var_allprocs_abs2meta["output"]
+    disc_meta_in = system._var_allprocs_discrete["input"]
+    disc_meta_out = system._var_allprocs_discrete["output"]
 
     for var_set, var_type in full_var_set:
         for name in var_set:
+            # Design variables can be requested by input name.
+            if var_type == "desvar":
+                name = var_set[name]["ivc_source"]
+
             if name not in meta:
                 try:
-                    meta[name] = real_meta[name].copy()
+                    meta[name] = real_meta_out[name].copy()
                     meta[name]["discrete"] = False
                 except KeyError:
-                    meta[name] = disc_meta["output"][name].copy()
+                    meta[name] = disc_meta_out[name].copy()
                     meta[name]["discrete"] = True
                 meta[name]["type"] = {}
                 meta[name]["explicit"] = name not in states
@@ -107,16 +106,16 @@ def generate_abs2meta(recording_requester):
             if var_type not in meta[name]["type"]:
                 try:
                     var_type_meta = var_set[name]
-                except TypeError:
+                except (KeyError, TypeError):
                     var_type_meta = {}
                 meta[name]["type"][var_type] = var_type_meta
 
     for name in inputs:
         try:
-            meta[name] = real_meta[name].copy()
+            meta[name] = real_meta_in[name].copy()
             meta[name]["discrete"] = False
         except KeyError:
-            meta[name] = disc_meta["input"][name].copy()
+            meta[name] = disc_meta_in[name].copy()
             meta[name]["discrete"] = True
         meta[name]["type"] = {"input": {}}
         meta[name]["explicit"] = True
