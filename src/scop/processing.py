@@ -1,8 +1,37 @@
 import numpy as np
+import pandas as pd
 import pygmo
 import xarray as xr
 
 from .constants import DESIGN_ID
+
+
+def xr_value_dims(name, value):
+    """
+    Returns the value and dimensions/coordinates in the way we like 'em.
+
+    >>> import xarray as xr
+    >>> name = "foo"
+    >>> value = np.array([1, 2, 3])
+    >>> xr_value, xr_dims = xr_value_dims(name, value)
+    >>> xr.DataArray(
+    ...     name=name,
+    ...     data=xr_value,
+    ...     coords=xr_dims,
+    ... )
+    <xarray.DataArray 'foo' (foo_dim: 3)>
+    array([1, 2, 3])
+    Coordinates:
+      * foo_dim          (foo_dim) MultiIndex
+      - foo_dim_level_0  (foo_dim) int64 0 1 2
+    """
+    val = np.atleast_1d(value).copy()
+    extra_dims = []
+    if val.size > 1:
+        idx = pd.MultiIndex.from_tuples(np.ndindex(val.shape))
+        extra_dims = [(f"{name}_dim", idx)]
+    val = val.reshape((-1,))
+    return val, extra_dims
 
 
 def _is_pareto_efficient(costs):
@@ -47,15 +76,37 @@ def objective_space(ds, scale=False):
     if not scale:
         return objectives
 
+    def _da(name, value):
+        value, dims = xr_value_dims(name, value)
+        return xr.DataArray(
+            name=name, data=value.item() if not dims else value, coords=dims or None
+        )
+
     scaler_ds = xr.Dataset(
         {
-            name: var.attrs["type"]["objective"]["scaler"] or 1.0
+            name: _da(
+                name=name,
+                value=(
+                    # We cannot use a simple (x or 1.0) since x might be an array
+                    var.attrs["type"]["objective"]["scaler"]
+                    if var.attrs["type"]["objective"]["scaler"] is not None
+                    else 1.0
+                ),
+            )
             for (name, var) in objectives.items()
         }
     )
     adder_ds = xr.Dataset(
         {
-            name: var.attrs["type"]["objective"]["adder"] or 0.0
+            name: _da(
+                name=name,
+                value=(
+                    # We cannot use a simple (x or 0.0) since x might be an array
+                    var.attrs["type"]["objective"]["adder"]
+                    if var.attrs["type"]["objective"]["adder"] is not None
+                    else 0.0
+                ),
+            )
             for (name, var) in objectives.items()
         }
     )

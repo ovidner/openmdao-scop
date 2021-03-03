@@ -11,6 +11,7 @@ from openmdao.recorders.case_recorder import CaseRecorder
 from openmdao.solvers.solver import Solver
 
 from .constants import DESIGN_ID
+from .processing import xr_value_dims
 
 
 def generate_abs2meta(recording_requester):
@@ -160,20 +161,17 @@ class DatasetRecorder(CaseRecorder):
         def make_data_vars():
             for (name, value) in all_vars.items():
                 meta = self._abs2meta[name]
-                val = np.atleast_1d(value).copy()
-                extra_dims = []
-                if val.size > 1:
-                    idx = pd.MultiIndex.from_tuples(np.ndindex(val.shape))
-                    extra_dims = [(f"{name}_dim", idx)]
-                    val = val.reshape((1, -1))
+                xr_value, xr_dims = xr_value_dims(name, value)
+                if xr_value.size > 1:
+                    xr_value = xr_value.reshape((1, -1))
 
                 yield (
                     name,
                     xr.DataArray(
-                        data=val,
+                        data=xr_value,
                         name=name,
                         attrs=meta,
-                        coords=[(DESIGN_ID, design_idx), *extra_dims],
+                        coords=[(DESIGN_ID, design_idx), *xr_dims],
                     ),
                 )
 
