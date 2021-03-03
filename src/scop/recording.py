@@ -216,10 +216,10 @@ class DatasetRecorder(CaseRecorder):
             "This recorder does not support recording of derivatives."
         )
 
-    def record_metadata_solver(self, recording_requester):
+    def record_metadata_solver(self, solver, run_number=None):
         pass
 
-    def record_metadata_system(self, recording_requester):
+    def record_metadata_system(self, system, run_number=None):
         pass
 
     def record_viewer_data(self, model_viewer_data):
