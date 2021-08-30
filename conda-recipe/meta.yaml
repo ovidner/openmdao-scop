@@ -32,5 +32,11 @@ requirements:
     - xarray
 
 test:
-  imports:
-    - scop
+  requires:
+    - hypothesis
+    - pytest
+  source_files:
+    - tests/
+    - pytest.ini
+  commands:
+    - pytest
