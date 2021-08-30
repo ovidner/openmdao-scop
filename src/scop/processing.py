@@ -157,9 +157,14 @@ def pareto_subset(ds):
     # objectives = ds.filter_by_attrs(role=VariableRole.OBJECTIVE)
     if len(ds[DESIGN_ID]) < 1:
         raise ValueError("Supplied dataset has no designs.")
-    scaled_objectives = objective_space(ds, scale=True).to_array()
+    scaled_objectives = (
+        objective_space(ds, scale=True)
+        .unstack()
+        .to_stacked_array("weights", sample_dims=[DESIGN_ID])
+    )
+
     pareto_mask = xr.DataArray(
-        is_pareto_efficient(scaled_objectives.T.values), dims=[DESIGN_ID]
+        is_pareto_efficient(scaled_objectives.values), dims=[DESIGN_ID]
     )
 
     return ds.where(pareto_mask, drop=True)
