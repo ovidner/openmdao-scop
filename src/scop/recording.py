@@ -58,7 +58,6 @@ def generate_abs2meta(recording_requester):
     outputs = list(system.abs_name_iter("output", local=False, discrete=True))
 
     full_var_set = [
-        (outputs, "output"),
         (desvars, "desvar"),
         (responses, "response"),
         (objectives, "objective"),
@@ -82,10 +81,16 @@ def generate_abs2meta(recording_requester):
 
     # absolute pathname to metadata mappings for continuous & discrete variables
     # discrete mapping is sub-keyed on 'output' & 'input'
-    real_meta_in = system._var_allprocs_abs2meta["input"]
-    real_meta_out = system._var_allprocs_abs2meta["output"]
-    disc_meta_in = system._var_allprocs_discrete["input"]
-    disc_meta_out = system._var_allprocs_discrete["output"]
+    real_meta = system._var_allprocs_abs2meta
+    disc_meta = system._var_allprocs_discrete
+
+    for kind, discrete in itertools.product(["input", "output"], [True, False]):
+        vars_meta = disc_meta if discrete else real_meta
+        for name, data in vars_meta[kind].items():
+            meta[name] = data.copy()
+            meta[name]["discrete"] = discrete
+            meta[name]["type"] = {kind: {}}
+            meta[name]["explicit"] = kind == "input" or name not in states
 
     for var_set, var_type in full_var_set:
         for name in var_set:
@@ -93,36 +98,12 @@ def generate_abs2meta(recording_requester):
             if var_type == "desvar":
                 name = var_set[name]["ivc_source"]
 
-            if name not in meta:
-                try:
-                    meta[name] = real_meta_out[name].copy()
-                    meta[name]["discrete"] = False
-                except KeyError:
-                    meta[name] = disc_meta_out[name].copy()
-                    meta[name]["discrete"] = True
-                meta[name]["type"] = {}
-                meta[name]["explicit"] = name not in states
-                # self._abs2meta[name]["tags"] = list(self._abs2meta[name].get("tags", []))
-
             if var_type not in meta[name]["type"]:
                 try:
                     var_type_meta = var_set[name]
                 except (KeyError, TypeError):
                     var_type_meta = {}
                 meta[name]["type"][var_type] = var_type_meta
-
-    for name in inputs:
-        try:
-            meta[name] = real_meta_in[name].copy()
-            meta[name]["discrete"] = False
-        except KeyError:
-            meta[name] = disc_meta_in[name].copy()
-            meta[name]["discrete"] = True
-        meta[name]["type"] = {"input": {}}
-        meta[name]["explicit"] = True
-        # self._abs2meta[name]["tags"] = list(self._abs2meta[name].get("tags", []))
-
-    ##### END ADAPTATION FROM SqliteRecorder #####
 
     return meta
 
