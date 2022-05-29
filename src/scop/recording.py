@@ -174,9 +174,7 @@ class DatasetRecorder(CaseRecorder):
             for (name, value) in all_vars.items():
                 meta = self._abs2meta[name]
                 val = np.atleast_1d(value).copy()
-                n_dims = val.ndim
                 if val.size > 1:
-                    extra_dims = [f"{name}_{idx}" for idx in range(n_dims)]
                     # Why coords with simple integer indexes? Answer: it makes
                     # it possible to merge all datasets even though the
                     # dimensions have different sizes.
@@ -186,7 +184,6 @@ class DatasetRecorder(CaseRecorder):
                     }
                     val = val[np.newaxis, ...]
                 else:
-                    extra_dims = []
                     extra_coords = {}
 
                 yield (
@@ -195,7 +192,6 @@ class DatasetRecorder(CaseRecorder):
                         data=val,
                         name=name,
                         attrs=meta,
-                        # dims=[DESIGN_ID, *extra_dims],
                         coords={DESIGN_ID: design_idx, **extra_coords},
                     ),
                 )
