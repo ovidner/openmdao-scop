@@ -156,7 +156,8 @@ def feasible_subset(ds):
 def pareto_subset(ds):
     # objectives = ds.filter_by_attrs(role=VariableRole.OBJECTIVE)
     if len(ds[DESIGN_ID]) < 1:
-        raise ValueError("Supplied dataset has no designs.")
+        return ds
+
     scaled_objectives = (
         objective_space(ds, scale=True)
         .unstack()
