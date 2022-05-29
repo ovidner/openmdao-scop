@@ -245,10 +245,4 @@ class DatasetRecorder(CaseRecorder):
         pass
 
     def assemble_dataset(self, recording_requester):
-        ds = xr.concat(self.datasets[recording_requester], dim=DESIGN_ID).squeeze()
-
-        # We don't want to squeeze away the DESIGN_ID dim, because of reasons
-        if DESIGN_ID not in ds.dims:
-            ds = ds.expand_dims(DESIGN_ID)
-
-        return ds
+        return xr.concat(self.datasets[recording_requester], dim=DESIGN_ID)
