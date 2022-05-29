@@ -1,4 +1,5 @@
 from .constants import DESIGN_ID  # noqa
+from .io import dump, load  # noqa
 from .processing import (  # noqa
     constraint_space,
     design_space,

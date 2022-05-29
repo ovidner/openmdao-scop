@@ -24,6 +24,8 @@ requirements:
     - pip
     - setuptools-scm
   run:
+    - h5netcdf
+    - jsonpickle
     - numpy
     - openmdao
     - pandas
@@ -35,6 +37,7 @@ test:
   requires:
     - hypothesis
     - pytest
+    - deepdiff
   source_files:
     - tests/
     - pytest.ini
