@@ -1,3 +1,5 @@
+import itertools
+import warnings
 from collections import OrderedDict
 from itertools import chain
 
@@ -11,10 +13,11 @@ from openmdao.recorders.case_recorder import CaseRecorder
 from openmdao.solvers.solver import Solver
 
 from .constants import DESIGN_ID
-from .processing import xr_value_dims
+
+SEMVAR_PREFIX = "semvar:"
 
 
-def generate_abs2meta(recording_requester):
+def generate_abs2meta(recording_requester, semvar_registry=None):
     meta = {}
     ##### START ADAPTATION FROM SqliteRecorder #####
     driver = None
@@ -105,11 +108,36 @@ def generate_abs2meta(recording_requester):
                     var_type_meta = {}
                 meta[name]["type"][var_type] = var_type_meta
 
+    if semvar_registry:
+        for name, data in meta.items():
+            tags = data.get("tags", set())
+            for tag in tags:
+                _, match, semvar_name = tag.partition(SEMVAR_PREFIX)
+                if match:
+                    data["semvar"] = semvar_registry.variables[semvar_name]
+                    break
+            else:
+                data["semvar"] = None
+
     return meta
 
 
+def get_dim_name(meta, name, idx):
+    semvar = meta.get("semvar", None)
+    if semvar:
+        if semvar.dims is not None:
+            try:
+                return semvar.dims[idx]
+            except IndexError:
+                warnings.warn(
+                    f"Semvar '{semvar.name}' defines {len(semvar.dims)} dimension names, but variable '{name}' is using more dimensions. Falling back to default dimension name."
+                )
+        return f"{semvar.name}_{idx}"
+    return f"{name}_{idx}"
+
+
 class DatasetRecorder(CaseRecorder):
-    def __init__(self, record_viewer_data=False):
+    def __init__(self, record_viewer_data=False, semvar_registry=None):
         if record_viewer_data:
             raise NotImplementedError(
                 "This recorder does not support recording of metadata for viewing."
@@ -119,13 +147,16 @@ class DatasetRecorder(CaseRecorder):
         # self._abs2prom = {"input": {}, "output": {}}
         # self._prom2abs = {"input": {}, "output": {}}
         self._abs2meta = {}
+        self.semvar_registry = semvar_registry
 
     def startup(self, recording_requester):
         super().startup(recording_requester)
         # ds = xr.Dataset(data_vars={"counter": xr.DataArray(), "timestamp": xr.DataArray()}, coords={"name": xr.DataArray()})
         self.datasets[recording_requester] = []
 
-        self._abs2meta.update(generate_abs2meta(recording_requester))
+        self._abs2meta.update(
+            generate_abs2meta(recording_requester, semvar_registry=self.semvar_registry)
+        )
 
     def record_iteration_driver(self, recording_requester, data, metadata):
         timestamp = pd.Timestamp.fromtimestamp(metadata["timestamp"])
@@ -137,22 +168,35 @@ class DatasetRecorder(CaseRecorder):
         #     [(metadata["name"], 0, self._counter - 1, self._iteration_coordinate)],
         #     names=("driver", "rank", "counter", "name"),
         # )
-        design_idx = [self._iteration_coordinate]
+        design_idx = np.array([self._iteration_coordinate])
 
         def make_data_vars():
             for (name, value) in all_vars.items():
                 meta = self._abs2meta[name]
-                xr_value, xr_dims = xr_value_dims(name, value)
-                if xr_value.size > 1:
-                    xr_value = xr_value.reshape((1, -1))
+                val = np.atleast_1d(value).copy()
+                n_dims = val.ndim
+                if val.size > 1:
+                    extra_dims = [f"{name}_{idx}" for idx in range(n_dims)]
+                    # Why coords with simple integer indexes? Answer: it makes
+                    # it possible to merge all datasets even though the
+                    # dimensions have different sizes.
+                    extra_coords = {
+                        get_dim_name(meta, name, idx): range(size)
+                        for idx, size in enumerate(val.shape)
+                    }
+                    val = val[np.newaxis, ...]
+                else:
+                    extra_dims = []
+                    extra_coords = {}
 
                 yield (
                     name,
                     xr.DataArray(
-                        data=xr_value,
+                        data=val,
                         name=name,
                         attrs=meta,
-                        coords=[(DESIGN_ID, design_idx), *xr_dims],
+                        # dims=[DESIGN_ID, *extra_dims],
+                        coords={DESIGN_ID: design_idx, **extra_coords},
                     ),
                 )
 
