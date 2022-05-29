@@ -6,34 +6,6 @@ import xarray as xr
 from .constants import DESIGN_ID
 
 
-def xr_value_dims(name, value):
-    """
-    Returns the value and dimensions/coordinates in the way we like 'em.
-
-    >>> import xarray as xr
-    >>> name = "foo"
-    >>> value = np.array([1, 2, 3])
-    >>> xr_value, xr_dims = xr_value_dims(name, value)
-    >>> xr.DataArray(
-    ...     name=name,
-    ...     data=xr_value,
-    ...     coords=xr_dims,
-    ... )
-    <xarray.DataArray 'foo' (foo_dim: 3)>
-    array([1, 2, 3])
-    Coordinates:
-      * foo_dim          (foo_dim) MultiIndex
-      - foo_dim_level_0  (foo_dim) int64 0 1 2
-    """
-    val = np.atleast_1d(value).copy()
-    extra_dims = []
-    if val.size > 1:
-        idx = pd.MultiIndex.from_tuples(np.ndindex(val.shape))
-        extra_dims = [(f"{name}_dim", idx)]
-    val = val.reshape((-1,))
-    return val, extra_dims
-
-
 def _is_pareto_efficient(costs):
     """
     Find the pareto-efficient points
@@ -76,16 +48,17 @@ def objective_space(ds, scale=False):
     if not scale:
         return objectives
 
-    def _da(name, value):
-        value, dims = xr_value_dims(name, value)
-        return xr.DataArray(
-            name=name, data=value.item() if not dims else value, coords=dims or None
-        )
+    def _da(name, var, value):
+        assert var.dims[0] == DESIGN_ID
+        val = np.broadcast_to(value, var.shape[1:])
+
+        return xr.DataArray(name=name, data=val, dims=var.dims[1:])
 
     scaler_ds = xr.Dataset(
         {
             name: _da(
                 name=name,
+                var=var,
                 value=(
                     # We cannot use a simple (x or 1.0) since x might be an array
                     var.attrs["type"]["objective"]["scaler"]
@@ -100,6 +73,7 @@ def objective_space(ds, scale=False):
         {
             name: _da(
                 name=name,
+                var=var,
                 value=(
                     # We cannot use a simple (x or 0.0) since x might be an array
                     var.attrs["type"]["objective"]["adder"]
