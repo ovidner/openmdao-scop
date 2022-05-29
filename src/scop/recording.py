@@ -130,7 +130,7 @@ class DatasetRecorder(CaseRecorder):
     def record_iteration_driver(self, recording_requester, data, metadata):
         timestamp = pd.Timestamp.fromtimestamp(metadata["timestamp"])
 
-        all_vars = dict(chain(data["input"].items(), data["output"].items()))
+        all_vars = dict(sorted(chain(data["input"].items(), data["output"].items())))
 
         # hvplot borks of MultiIndex :((
         # design_idx = pd.MultiIndex.from_tuples(
