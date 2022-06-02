@@ -136,6 +136,28 @@ def get_dim_name(meta, name, idx):
     return f"{name}_{idx}"
 
 
+def make_data_vars(all_vars, all_meta, design_idx):
+    for (name, value) in all_vars.items():
+        meta = all_meta[name]
+        val = np.atleast_1d(value).copy()
+        if val.size > 1:
+            # Why coords with simple integer indexes? Answer: it makes
+            # it possible to merge all datasets even though the
+            # dimensions have different sizes.
+            extra_coords = {
+                get_dim_name(meta, name, idx): range(size)
+                for idx, size in enumerate(val.shape)
+            }
+            val = val[np.newaxis, ...]
+        else:
+            extra_coords = {}
+
+        coords = {DESIGN_ID: design_idx, **extra_coords}
+        dims = list(coords.keys())
+
+        yield ((name, (dims, val, meta)), coords.items())
+
+
 class DatasetRecorder(CaseRecorder):
     def __init__(self, record_viewer_data=False, semvar_registry=None):
         if record_viewer_data:
@@ -170,33 +192,14 @@ class DatasetRecorder(CaseRecorder):
         # )
         design_idx = np.array([self._iteration_coordinate])
 
-        def make_data_vars():
-            for (name, value) in all_vars.items():
-                meta = self._abs2meta[name]
-                val = np.atleast_1d(value).copy()
-                if val.size > 1:
-                    # Why coords with simple integer indexes? Answer: it makes
-                    # it possible to merge all datasets even though the
-                    # dimensions have different sizes.
-                    extra_coords = {
-                        get_dim_name(meta, name, idx): range(size)
-                        for idx, size in enumerate(val.shape)
-                    }
-                    val = val[np.newaxis, ...]
-                else:
-                    extra_coords = {}
-
-                coords = {DESIGN_ID: design_idx, **extra_coords}
-                dims = list(coords.keys())
-
-                yield ((name, (dims, val, meta)), coords.items())
-
         meta_vars = {
             key: xr.DataArray([item], dims=[DESIGN_ID])
             for (key, item) in metadata.items()
             if key not in ["name", "success", "timestamp", "msg"]
         }
-        data_vars_pairs, coords_pairs = zip(*make_data_vars())
+        data_vars_pairs, coords_pairs = zip(
+            *make_data_vars(all_vars, self._abs2meta, design_idx)
+        )
         data_vars = dict(data_vars_pairs)
         coords = dict(itertools.chain(*coords_pairs))
 
