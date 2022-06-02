@@ -186,22 +186,19 @@ class DatasetRecorder(CaseRecorder):
                 else:
                     extra_coords = {}
 
-                yield (
-                    name,
-                    xr.DataArray(
-                        data=val,
-                        name=name,
-                        attrs=meta,
-                        coords={DESIGN_ID: design_idx, **extra_coords},
-                    ),
-                )
+                coords = {DESIGN_ID: design_idx, **extra_coords}
+                dims = list(coords.keys())
+
+                yield ((name, (dims, val, meta)), coords.items())
 
         meta_vars = {
             key: xr.DataArray([item], dims=[DESIGN_ID])
             for (key, item) in metadata.items()
             if key not in ["name", "success", "timestamp", "msg"]
         }
-        data_vars = dict(make_data_vars())
+        data_vars_pairs, coords_pairs = zip(*make_data_vars())
+        data_vars = dict(data_vars_pairs)
+        coords = dict(itertools.chain(*coords_pairs))
 
         ds = xr.Dataset(
             data_vars={
@@ -211,6 +208,7 @@ class DatasetRecorder(CaseRecorder):
                 **meta_vars,
                 **data_vars,
             },
+            coords=coords,
         )
 
         self.datasets[recording_requester].append(ds)
