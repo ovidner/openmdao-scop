@@ -115,7 +115,7 @@ def feasible_subset(ds):
         }
     )
 
-    ineq_feasibility_per_constraint = xr.ufuncs.logical_and(
+    ineq_feasibility_per_constraint = np.logical_and(
         ineq_constraints >= lower_bound_ds, ineq_constraints <= upper_bound_ds
     ).to_array()
 
@@ -175,11 +175,9 @@ def constraint_violations(ds):
     ).to_array()
     upper_bound_da_eps = epsilonify(upper_bound_da)
 
-    ineq_cv_per_constraint = xr.ufuncs.fabs(
-        xr.ufuncs.fmax(upper_bound_da, ineq_constraints_ds) / upper_bound_da_eps - 1
-    ) + xr.ufuncs.fabs(
-        xr.ufuncs.fmin(lower_bound_da, ineq_constraints_ds) / lower_bound_da_eps - 1
-    )
+    ineq_cv_per_constraint = np.fabs(
+        np.fmax(upper_bound_da, ineq_constraints_ds) / upper_bound_da_eps - 1
+    ) + np.fabs(np.fmin(lower_bound_da, ineq_constraints_ds) / lower_bound_da_eps - 1)
 
     # Applies sum() on all dimensions except DESIGN_ID
     ineq_feasibility_per_design = (
