@@ -171,8 +171,8 @@ class DatasetRecorder(CaseRecorder):
         self._abs2meta = {}
         self.semvar_registry = semvar_registry
 
-    def startup(self, recording_requester):
-        super().startup(recording_requester)
+    def startup(self, recording_requester, comm=None):
+        super().startup(recording_requester, comm=comm)
         # ds = xr.Dataset(data_vars={"counter": xr.DataArray(), "timestamp": xr.DataArray()}, coords={"name": xr.DataArray()})
         self.datasets[recording_requester] = []
 
