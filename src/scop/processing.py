@@ -1,5 +1,4 @@
 import numpy as np
-import pandas as pd
 import pygmo
 import xarray as xr
 
@@ -93,7 +92,6 @@ def constraint_space(ds):
 
 
 def feasible_subset(ds):
-    # objectives = ds.filter_by_attrs(role=VariableRole.OBJECTIVE)
     constraints = constraint_space(ds)
     eq_constraints = constraints.filter_by_attrs(
         type=lambda x: x and x["constraint"]["equals"] is not None
