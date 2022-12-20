@@ -102,29 +102,32 @@ def feasible_subset(ds):
         type=lambda x: x and x["constraint"]["equals"] is None
     )
 
-    lower_bound_ds = xr.Dataset(
-        {
-            name: var.attrs["type"]["constraint"]["lower"]
-            for (name, var) in ineq_constraints.items()
-        }
-    )
-    upper_bound_ds = xr.Dataset(
-        {
-            name: var.attrs["type"]["constraint"]["upper"]
-            for (name, var) in ineq_constraints.items()
-        }
-    )
+    if ineq_constraints:
+        lower_bound_ds = xr.Dataset(
+            {
+                name: var.attrs["type"]["constraint"]["lower"]
+                for (name, var) in ineq_constraints.items()
+            }
+        )
+        upper_bound_ds = xr.Dataset(
+            {
+                name: var.attrs["type"]["constraint"]["upper"]
+                for (name, var) in ineq_constraints.items()
+            }
+        )
 
-    ineq_feasibility_per_constraint = np.logical_and(
-        ineq_constraints >= lower_bound_ds, ineq_constraints <= upper_bound_ds
-    ).to_array()
+        ineq_feasibility_per_constraint = np.logical_and(
+            ineq_constraints >= lower_bound_ds, ineq_constraints <= upper_bound_ds
+        ).to_array()
 
-    # Applies all() on all dimensions except DESIGN_ID
-    ineq_feasibility_per_design = ineq_feasibility_per_constraint.groupby(
-        DESIGN_ID
-    ).all(...)
+        # Applies all() on all dimensions except DESIGN_ID
+        ineq_feasibility_per_design = ineq_feasibility_per_constraint.groupby(
+            DESIGN_ID
+        ).all(...)
 
-    return ds.where(ineq_feasibility_per_design, drop=True)
+        ds = ds.where(ineq_feasibility_per_design, drop=True)
+
+    return ds
 
 
 def pareto_subset(ds):
