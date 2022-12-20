@@ -34,6 +34,7 @@ jobs:
   test:
     needs: package
     strategy:
+      fail-fast: false
       matrix:
         os:
           - ubuntu-latest
