@@ -102,6 +102,9 @@ def feasible_subset(ds):
         type=lambda x: x and x["constraint"]["equals"] is None
     )
 
+    if eq_constraints:
+        raise NotImplementedError("Equality constraints are not supported yet")
+
     if ineq_constraints:
         lower_bound_ds = xr.Dataset(
             {
