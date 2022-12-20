@@ -171,8 +171,12 @@ class DatasetRecorder(CaseRecorder):
         self._abs2meta = {}
         self.semvar_registry = semvar_registry
 
-    def startup(self, recording_requester):
-        super().startup(recording_requester)
+    def startup(self, recording_requester, comm=None):
+        try:
+            super().startup(recording_requester, comm=comm)
+        except TypeError:
+            # Backwards compatibility for OpenMDAO < 3.something
+            super().startup(recording_requester)
         # ds = xr.Dataset(data_vars={"counter": xr.DataArray(), "timestamp": xr.DataArray()}, coords={"name": xr.DataArray()})
         self.datasets[recording_requester] = []
 
