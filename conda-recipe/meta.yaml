@@ -43,3 +43,9 @@ test:
     - pytest.ini
   commands:
     - pytest
+
+extra:
+  channels:
+    # For conda-lock
+    - conda-forge
+    - defaults
