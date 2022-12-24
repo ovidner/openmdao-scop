@@ -92,7 +92,10 @@ def test_pareto_dataset(weights):
 def test_dump_load(tmp_path):
     var_shape = (3,)
     prob = om.Problem()
-    prob.model.add_subsystem("indeps", om.IndepVarComp("x", nans(var_shape)))
+    indeps = prob.model.add_subsystem("indeps", om.IndepVarComp("x", nans(var_shape)))
+    # Add a few troublesome outputs
+    indeps.add_discrete_output("bool", True)
+    indeps.add_discrete_output("array", np.array([1, 2, 3]))
     prob.model.add_subsystem(
         "passthrough",
         om.ExecComp(
@@ -126,6 +129,7 @@ def test_dump_load(tmp_path):
     )
 
     recorder = scop.DatasetRecorder()
+    driver.recording_options["includes"] = ["*"]
     driver.add_recorder(recorder)
 
     try:
