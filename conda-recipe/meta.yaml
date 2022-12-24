@@ -27,7 +27,7 @@ requirements:
     - h5netcdf
     - jsonpickle
     - numpy
-    - openmdao
+    - openmdao<3.17
     - pandas
     - pygmo
     - python
