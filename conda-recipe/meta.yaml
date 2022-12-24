@@ -32,6 +32,7 @@ requirements:
     - pygmo
     - python
     - xarray
+    - zarr
 
 test:
   requires:
