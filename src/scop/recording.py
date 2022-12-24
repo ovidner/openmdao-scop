@@ -125,12 +125,13 @@ def generate_abs2meta(recording_requester, semvar_registry=None):
 def get_dim_name(meta, name, idx):
     semvar = meta.get("semvar", None)
     if semvar:
-        if semvar.dims is not None:
+        dims = getattr(semvar.space, "dims", None)
+        if dims is not None:
             try:
-                return semvar.dims[idx]
+                return dims[idx]
             except IndexError:
                 warnings.warn(
-                    f"Semvar '{semvar.name}' defines {len(semvar.dims)} dimension names, but variable '{name}' is using more dimensions. Falling back to default dimension name."
+                    f"Semvar '{semvar.name}' defines {len(dims)} dimension names, but variable '{name}' is using more dimensions. Falling back to default dimension name."
                 )
         return f"{semvar.name}_{idx}"
     return f"{name}_{idx}"
