@@ -208,18 +208,27 @@ class DatasetRecorder(CaseRecorder):
         data_vars = dict(data_vars_pairs)
         coords = dict(itertools.chain(*coords_pairs))
 
-        ds = xr.Dataset(
-            data_vars={
-                "timestamp": xr.DataArray([timestamp], dims=[DESIGN_ID]),
-                "success": xr.DataArray([bool(metadata["success"])], dims=[DESIGN_ID]),
-                "msg": xr.DataArray([metadata["msg"]], dims=[DESIGN_ID]),
-                **meta_vars,
-                **data_vars,
-            },
-            coords=coords,
-        )
-
-        self.datasets[recording_requester].append(ds)
+        try:
+            ds = xr.Dataset(
+                data_vars={
+                    "timestamp": xr.DataArray([timestamp], dims=[DESIGN_ID]),
+                    "success": xr.DataArray(
+                        [bool(metadata["success"])], dims=[DESIGN_ID]
+                    ),
+                    "msg": xr.DataArray([metadata["msg"]], dims=[DESIGN_ID]),
+                    **meta_vars,
+                    **data_vars,
+                },
+                coords=coords,
+            )
+        except ValueError as e:
+            # FIXME: we should record this error in the dataset instead
+            warnings.warn(
+                f"Failed to create dataset for iteration {self._iteration_coordinate} with metadata {metadata}",
+                source=e,
+            )
+        else:
+            self.datasets[recording_requester].append(ds)
 
     def record_iteration_problem(self, recording_requester, data, metadata):
         raise NotImplementedError(
