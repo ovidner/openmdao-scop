@@ -62,6 +62,16 @@ def dump_zarr(ds, path, **kwargs):
     # Make a shallow copy so we don't mangle the attrs of the ds we're dumping.
     enc_ds = ds.copy(deep=False)
 
+    _unsafe_var_names = [(name, name.replace(":", ".")) for name in enc_ds.variables if ":" in name]
+    unsafe_var_names_fw = {orig: new for orig, new in _unsafe_var_names}
+    unsafe_var_names_bw = {new: orig for orig, new in _unsafe_var_names}
+
+    # Make sure we don't have any name collisions.
+    assert len(unsafe_var_names_fw) == len(unsafe_var_names_bw)
+
+    enc_ds = enc_ds.rename(unsafe_var_names_fw)
+    enc_ds.attrs["_scop:unsafe_var_names"] = unsafe_var_names_bw
+
     enc_ds.attrs = jsonencode_attrs(enc_ds.attrs)
 
     for var in enc_ds.variables.values():
@@ -84,6 +94,10 @@ def _load_postprocess(ds):
     ds.attrs = jsondecode_attrs(ds.attrs)
     for var in ds.variables.values():
         var.attrs = jsondecode_attrs(var.attrs)
+
+    unsafe_var_names = ds.attrs.pop("_scop:unsafe_var_names", None)
+    if unsafe_var_names:
+        ds = ds.rename(unsafe_var_names)
 
     return ds
 

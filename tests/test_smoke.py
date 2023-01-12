@@ -96,6 +96,7 @@ def test_dump_load(tmp_path):
     # Add a few troublesome outputs
     indeps.add_discrete_output("bool", True)
     indeps.add_discrete_output("array", np.array([1, 2, 3]))
+    indeps.add_discrete_output("name:unsafe", 0)
     prob.model.add_subsystem(
         "passthrough",
         om.ExecComp(
