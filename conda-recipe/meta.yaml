@@ -26,7 +26,7 @@ requirements:
   run:
     - h5netcdf
     - jsonpickle
-    - numpy
+    - numpy<1.24  # Due to np.complex deprecation incompatible with OpenMDAO
     - openmdao<3.17
     - pandas
     - pygmo
