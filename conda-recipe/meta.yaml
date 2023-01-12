@@ -46,7 +46,11 @@ test:
     - pytest
 
 extra:
-  channels:
-    # For conda-lock
+  channels:  # For conda-lock
     - conda-forge
     - defaults
+  platforms:  # For conda-lock
+    - linux-64
+    - osx-64
+    - osx-arm64
+    - win-64
