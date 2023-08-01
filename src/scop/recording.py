@@ -1,4 +1,5 @@
 import itertools
+import time
 import warnings
 from collections import OrderedDict
 from itertools import chain
@@ -7,14 +8,39 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 from openmdao.core.driver import Driver
+from openmdao.core.group import Group
 from openmdao.core.problem import Problem
 from openmdao.core.system import System
 from openmdao.recorders.case_recorder import CaseRecorder
 from openmdao.solvers.solver import Solver
 
 from .constants import DESIGN_ID
+from .modelling import Param
 
 SEMVAR_PREFIX = "semvar:"
+
+RecordingRequester = Driver | System | Problem | Solver
+
+
+def _gen_abs_names_to_params(
+    system: Group, abs_names: list[str]
+) -> tuple[str, Param | None]:
+    sys_cache = {}
+    for abs_name in abs_names:
+        subsystem_path, local_name = abs_name.rsplit(".", 1)
+        try:
+            subsystem = sys_cache[subsystem_path]
+        except KeyError:
+            subsystem = sys_cache[subsystem_path] = system._get_subsystem(
+                subsystem_path
+            )
+
+        if hasattr(subsystem, "_scop_meta"):
+            # FIXME: this is pretty ugly
+            param = subsystem._scop_meta["inputs"].get(
+                local_name, None
+            ) or subsystem._scop_meta["outputs"].get(local_name, None)
+            yield (abs_name, param)
 
 
 def generate_abs2meta(recording_requester, semvar_registry=None):
@@ -99,7 +125,10 @@ def generate_abs2meta(recording_requester, semvar_registry=None):
         for name in var_set:
             # Design variables can be requested by input name.
             if var_type == "desvar":
-                name = var_set[name]["ivc_source"]
+                try:
+                    name = var_set[name]["source"]
+                except KeyError:
+                    name = var_set[name]["ivc_source"]
 
             if var_type not in meta[name]["type"]:
                 try:
@@ -108,7 +137,12 @@ def generate_abs2meta(recording_requester, semvar_registry=None):
                     var_type_meta = {}
                 meta[name]["type"][var_type] = var_type_meta
 
+    abs_to_params = dict(_gen_abs_names_to_params(system, meta.keys()))
+    for name, data in meta.items():
+        data["param"] = abs_to_params.get(name, None)
+
     if semvar_registry:
+        # FIXME: legacy method, remove this!
         for name, data in meta.items():
             tags = data.get("tags", set())
             for tag in tags:
@@ -138,7 +172,7 @@ def get_dim_name(meta, name, idx):
 
 
 def make_data_vars(all_vars, all_meta, design_idx):
-    for (name, value) in all_vars.items():
+    for name, value in all_vars.items():
         meta = all_meta[name]
         val = np.atleast_1d(value).copy()
         if val.size > 1:
@@ -166,28 +200,28 @@ class DatasetRecorder(CaseRecorder):
                 "This recorder does not support recording of metadata for viewing."
             )
         super().__init__(record_viewer_data=record_viewer_data)
-        self.datasets = {}
+        self.datasets: dict[RecordingRequester, list[xr.DataSet]] = {}
+        self._start_perf_counter: dict[RecordingRequester, float] = {}
+        self._start_timestamp: dict[RecordingRequester, pd.Timestamp] = {}
         # self._abs2prom = {"input": {}, "output": {}}
         # self._prom2abs = {"input": {}, "output": {}}
         self._abs2meta = {}
         self.semvar_registry = semvar_registry
 
-    def startup(self, recording_requester, comm=None):
+    def startup(self, recording_requester: RecordingRequester, comm=None):
         try:
             super().startup(recording_requester, comm=comm)
         except TypeError:
             # Backwards compatibility for OpenMDAO < 3.something
             super().startup(recording_requester)
-        # ds = xr.Dataset(data_vars={"counter": xr.DataArray(), "timestamp": xr.DataArray()}, coords={"name": xr.DataArray()})
+        self._start_perf_counter[recording_requester] = time.perf_counter()
+        self._start_timestamp[recording_requester] = pd.Timestamp.utcnow()
         self.datasets[recording_requester] = []
-
         self._abs2meta.update(
             generate_abs2meta(recording_requester, semvar_registry=self.semvar_registry)
         )
 
     def record_iteration_driver(self, recording_requester, data, metadata):
-        timestamp = pd.Timestamp.fromtimestamp(metadata["timestamp"])
-
         all_vars = dict(sorted(chain(data["input"].items(), data["output"].items())))
 
         # hvplot borks of MultiIndex :((
@@ -197,11 +231,23 @@ class DatasetRecorder(CaseRecorder):
         # )
         design_idx = np.array([self._iteration_coordinate])
 
+        # Pass on any non-default metadata
         meta_vars = {
-            key: xr.DataArray([item], dims=[DESIGN_ID])
+            f"meta.{key}": xr.DataArray([item], dims=[DESIGN_ID])
             for (key, item) in metadata.items()
             if key not in ["name", "success", "timestamp", "msg"]
         }
+
+        # To convert OpenMDAO's timestamp (which comes from
+        # time.perf_counter()) to absolute time, we need to do some
+        # gymnastics
+        rel_timestamp = (
+            metadata["timestamp"] - self._start_perf_counter[recording_requester]
+        )
+        timestamp = self._start_timestamp[recording_requester] + pd.Timedelta(
+            rel_timestamp, "s"
+        )
+
         data_vars_pairs, coords_pairs = zip(
             *make_data_vars(all_vars, self._abs2meta, design_idx)
         )
@@ -211,11 +257,13 @@ class DatasetRecorder(CaseRecorder):
         try:
             ds = xr.Dataset(
                 data_vars={
-                    "timestamp": xr.DataArray([timestamp], dims=[DESIGN_ID]),
-                    "success": xr.DataArray(
+                    "meta.timestamp": xr.DataArray(
+                        [timestamp.to_numpy()], dims=[DESIGN_ID]
+                    ),
+                    "meta.success": xr.DataArray(
                         [bool(metadata["success"])], dims=[DESIGN_ID]
                     ),
-                    "msg": xr.DataArray([metadata["msg"]], dims=[DESIGN_ID]),
+                    "meta.msg": xr.DataArray([metadata["msg"]], dims=[DESIGN_ID]),
                     **meta_vars,
                     **data_vars,
                 },
@@ -260,4 +308,10 @@ class DatasetRecorder(CaseRecorder):
         pass
 
     def assemble_dataset(self, recording_requester):
-        return xr.concat(self.datasets[recording_requester], dim=DESIGN_ID)
+        ds = xr.concat(self.datasets[recording_requester], dim=DESIGN_ID)
+        # For the sake of consistency, convert the start timestamp to
+        # NumPy datetime64
+        ds.attrs["start_timestamp"] = self._start_timestamp[
+            recording_requester
+        ].to_numpy()
+        return ds
