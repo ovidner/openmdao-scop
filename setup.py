@@ -10,5 +10,13 @@ setup(
     setup_requires=["setuptools_scm"],
     # FIXME: this should also list pygmo as a requirement. However, pygmo lacks
     # the correct metadata even when installed with Conda, so it will just break.
-    install_requires=["openmdao", "numpy", "pandas", "xarray"],
+    install_requires=[
+        "jsonpickle",
+        "openmdao",
+        "numpy",
+        "pandas",
+        "pydantic",
+        "xarray",
+        "zarr",
+    ],
 )

@@ -26,9 +26,10 @@ requirements:
   run:
     - h5netcdf
     - jsonpickle
-    - numpy<1.24  # Due to np.complex deprecation incompatible with OpenMDAO
-    - openmdao<3.17
+    - numpy
+    - openmdao
     - pandas
+    - pydantic
     - pygmo
     - python
     - xarray
@@ -39,6 +40,7 @@ test:
     - hypothesis
     - pytest
     - deepdiff
+    - invoke
   source_files:
     - tests/
     - pytest.ini
